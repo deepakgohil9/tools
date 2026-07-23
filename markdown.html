@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Markdown Preview</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<!-- Markdown + sanitize + highlight (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<style>
+  :root {
+    --bg:        #14161b;
+    --panel:     #191c22;
+    --panel-2:   #1e222a;
+    --border:    #2a2f3a;
+    --border-2:  #353b48;
+    --text:      #e7e9ee;
+    --muted:     #868c9b;
+    --muted-2:   #5f6573;
+    --accent:    #8aa1ff;
+    --accent-dim:#4a5580;
+    --code-bg:   #12141a;
+    --radius:    10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex: none;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-right: auto;
+  }
+  .brand .mark {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .brand .sub {
+    font-size: 12px;
+    color: var(--muted-2);
+    letter-spacing: 0.3px;
+  }
+
+  .controls { display: flex; align-items: center; gap: 10px; }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch {
+    width: 34px; height: 19px;
+    border-radius: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    position: relative;
+    transition: background .18s ease, border-color .18s ease;
+    flex: none;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform .18s ease, background .18s ease;
+  }
+  .toggle input:checked + .switch {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .toggle input:checked + .switch::after {
+    transform: translateX(15px);
+    background: var(--accent);
+  }
+  .toggle input:focus-visible + .switch {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button.btn {
+    font-family: "Inter", sans-serif;
+    font-size: 12.5px;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    padding: 7px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  button.btn:hover { border-color: var(--accent); color: var(--accent); }
+  button.btn:active { background: var(--bg); }
+  button.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Split layout ---------- */
+  .split {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+  #editorPane  { width: 50%; }
+  #previewPane { flex: 1; border-left: 1px solid var(--border); }
+
+  .pane-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .pane-head .count { color: var(--muted-2); text-transform: none; letter-spacing: 0; }
+
+  /* ---------- Editor ---------- */
+  #editor {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.7;
+    padding: 20px 22px;
+    tab-size: 2;
+    caret-color: var(--accent);
+  }
+  #editor::placeholder { color: var(--muted-2); }
+  #editor::selection { background: rgba(138,161,255,0.25); }
+
+  /* ---------- Divider ---------- */
+  .divider {
+    width: 9px;
+    flex: none;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+    z-index: 5;
+  }
+  .divider::before {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: var(--border);
+    transition: background .15s ease, width .15s ease;
+  }
+  .divider:hover::before,
+  .divider.dragging::before {
+    background: var(--accent);
+    width: 2px;
+  }
+  body.resizing { cursor: col-resize; user-select: none; }
+
+  /* ---------- Rendered markdown ---------- */
+  #preview {
+    flex: 1;
+    overflow-y: auto;
+    padding: 26px 34px 60px;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.72;
+    color: var(--text);
+  }
+  #preview > :first-child { margin-top: 0; }
+
+  #preview h1, #preview h2, #preview h3,
+  #preview h4, #preview h5, #preview h6 {
+    font-family: "Inter", sans-serif;
+    line-height: 1.25;
+    font-weight: 600;
+    color: #f4f5f8;
+    margin: 1.7em 0 0.6em;
+  }
+  #preview h1 { font-size: 1.9em; letter-spacing: -0.5px; }
+  #preview h2 { font-size: 1.5em; letter-spacing: -0.3px; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+  #preview h3 { font-size: 1.22em; }
+  #preview h4 { font-size: 1.05em; color: var(--muted); }
+
+  #preview p { margin: 0 0 1.05em; }
+  #preview a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim); }
+  #preview a:hover { border-bottom-color: var(--accent); }
+  #preview strong { color: #fff; font-weight: 600; }
+  #preview em { color: #dfe2ea; }
+
+  #preview ul, #preview ol { margin: 0 0 1.05em; padding-left: 1.4em; }
+  #preview li { margin: 0.3em 0; }
+  #preview li::marker { color: var(--accent-dim); }
+
+  #preview blockquote {
+    margin: 1.2em 0;
+    padding: 0.2em 1.1em;
+    border-left: 3px solid var(--accent-dim);
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  #preview code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.12em 0.4em;
+    color: #d6dbe8;
+  }
+  #preview pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 1.2em 0;
+    line-height: 1.55;
+  }
+  #preview pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+  }
+
+  #preview table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.2em 0;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+  }
+  #preview th, #preview td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  #preview th { background: var(--panel-2); font-weight: 600; }
+  #preview tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+  #preview hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+  #preview img { max-width: 100%; border-radius: var(--radius); }
+
+  /* scrollbars */
+  #preview::-webkit-scrollbar, #editor::-webkit-scrollbar { width: 10px; height: 10px; }
+  #preview::-webkit-scrollbar-thumb, #editor::-webkit-scrollbar-thumb {
+    background: var(--border-2); border-radius: 10px; border: 3px solid var(--bg);
+  }
+  #preview::-webkit-scrollbar-thumb:hover, #editor::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  .empty { color: var(--muted-2); font-family: "Inter", sans-serif; font-size: 14px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 720px) {
+    .split { flex-direction: column; }
+    #editorPane, #previewPane { width: 100% !important; flex: 1; }
+    #previewPane { border-left: none; border-top: 1px solid var(--border); }
+    .divider { display: none; }
+    .brand .sub { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="mark">md ›</span>
+      <span class="sub">live markdown preview</span>
+    </div>
+    <div class="controls">
+      <label class="toggle" title="Convert literal \n sequences into real line breaks">
+        <input type="checkbox" id="unescape" checked />
+        <span class="switch"></span>
+        <span>unescape \n</span>
+      </label>
+      <button class="btn" id="copyMd">Copy MD</button>
+      <button class="btn" id="clear">Clear</button>
+    </div>
+  </header>
+
+  <div class="split" id="split">
+    <section class="pane" id="editorPane">
+      <div class="pane-head">
+        <span>Markdown</span>
+        <span class="count" id="editorCount">0 chars · 0 lines</span>
+      </div>
+      <textarea id="editor" spellcheck="false" placeholder="Type or paste markdown here…  literal \n will become line breaks"></textarea>
+    </section>
+
+    <div class="divider" id="divider" role="separator" aria-label="Resize panes"></div>
+
+    <section class="pane" id="previewPane">
+      <div class="pane-head"><span>Preview</span></div>
+      <article id="preview"></article>
+    </section>
+  </div>
+
+<script>
+  const editor      = document.getElementById('editor');
+  const preview     = document.getElementById('preview');
+  const unescapeBox = document.getElementById('unescape');
+  const editorCount = document.getElementById('editorCount');
+
+  // Configure marked + highlight.js
+  marked.setOptions({
+    gfm: true,
+    breaks: true,
+    highlight(code, lang) {
+      try {
+        if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
+        return hljs.highlightAuto(code).value;
+      } catch (e) { return code; }
+    }
+  });
+
+  // Turn literal escape sequences into real characters.
+  function unescapeText(str) {
+    return str
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\r/g, '\n');
+  }
+
+  function render() {
+    const raw = editor.value;
+    const source = unescapeBox.checked ? unescapeText(raw) : raw;
+
+    if (!source.trim()) {
+      preview.innerHTML = '<p class="empty">Nothing to preview yet — start typing on the left.</p>';
+    } else {
+      const dirty = marked.parse(source);
+      preview.innerHTML = DOMPurify.sanitize(dirty);
+    }
+
+    const lines = raw.length ? raw.split('\n').length : 0;
+    editorCount.textContent = `${raw.length} chars · ${lines} lines`;
+  }
+
+  editor.addEventListener('input', render);
+  unescapeBox.addEventListener('change', render);
+
+  document.getElementById('clear').addEventListener('click', () => {
+    editor.value = '';
+    editor.focus();
+    render();
+  });
+
+  document.getElementById('copyMd').addEventListener('click', async (e) => {
+    try {
+      await navigator.clipboard.writeText(editor.value);
+      const btn = e.currentTarget;
+      const t = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => (btn.textContent = t), 1200);
+    } catch (_) {}
+  });
+
+  // Tab inserts two spaces instead of leaving the field
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = editor.selectionStart, en = editor.selectionEnd;
+      editor.value = editor.value.slice(0, s) + '  ' + editor.value.slice(en);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+      render();
+    }
+  });
+
+  /* ---------- Draggable divider ---------- */
+  const split    = document.getElementById('split');
+  const divider  = document.getElementById('divider');
+  const editPane = document.getElementById('editorPane');
+  let dragging = false;
+
+  divider.addEventListener('mousedown', () => {
+    dragging = true;
+    divider.classList.add('dragging');
+    document.body.classList.add('resizing');
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove('dragging');
+    document.body.classList.remove('resizing');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = split.getBoundingClientRect();
+    let pct = ((e.clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(18, Math.min(82, pct));
+    editPane.style.width = pct + '%';
+  });
+
+  // Sample content
+  editor.value = [
+    '# Markdown Preview',
+    '',
+    'A tidy split-view editor. Text on the left, **rendered output** on the right.',
+    '',
+    '> Toggle *unescape \\n* in the header — pasted text with literal',
+    '> `\\n` gets turned into real line breaks.\\n\\nLike this second paragraph.',
+    '',
+    '## Features',
+    '',
+    '- GitHub-flavored markdown',
+    '- Syntax highlighted code',
+    '- Tables, quotes, task lists',
+    '',
+    '```js',
+    'function greet(name) {',
+    '  return `hello, ${name}`;',
+    '}',
+    '```',
+    '',
+    '| Item | Value |',
+    '| ---- | ----- |',
+    '| Rows | Yes   |',
+    '| Dark | Yes   |'
+  ].join('\n');
+
+  render();
+</script>
+</body>
+</html>

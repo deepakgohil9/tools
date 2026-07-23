@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IT Tools</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg:        #14161b;
+    --panel:     #191c22;
+    --panel-2:   #1e222a;
+    --border:    #2a2f3a;
+    --border-2:  #353b48;
+    --text:      #e7e9ee;
+    --muted:     #868c9b;
+    --muted-2:   #5f6573;
+    --accent:    #8aa1ff;
+    --accent-dim:#4a5580;
+    --radius:    10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header { margin-bottom: 40px; }
+
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 560px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    transition: border-color .15s ease, transform .15s ease, background .15s ease;
+  }
+
+  .card:hover {
+    border-color: var(--accent-dim);
+    background: var(--panel-2);
+    transform: translateY(-2px);
+  }
+
+  .card .icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .card h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .card p {
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+
+  .card .arrow {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted-2);
+    transition: color .15s ease;
+  }
+  .card:hover .arrow { color: var(--accent); }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted-2);
+    font-size: 12.5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">IT&nbsp;Tools</div>
+      <h1>A small collection of tools</h1>
+      <p>Fast, single-page utilities that run entirely in your browser. Nothing is uploaded — everything stays local.</p>
+    </header>
+
+    <main class="grid">
+      <a class="card" href="json-complexity.html">
+        <div class="icon">{&nbsp;}</div>
+        <h2>JSON Complexity</h2>
+        <p>Paste JSON to visualize its structure and see depth, size, and complexity metrics.</p>
+        <div class="arrow">Open &rarr;</div>
+      </a>
+
+      <a class="card" href="markdown.html">
+        <div class="icon">&#9776;</div>
+        <h2>Markdown Preview</h2>
+        <p>Write Markdown on the left and get a live, rendered preview with syntax highlighting.</p>
+        <div class="arrow">Open &rarr;</div>
+      </a>
+    </main>
+
+    <footer>
+      Built with plain HTML, CSS &amp; JS &middot; Hosted on GitHub Pages
+    </footer>
+  </div>
+</body>
+</html>
