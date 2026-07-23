@@ -72,6 +72,8 @@
   }
   button.btn:hover { border-color: var(--accent); color: var(--accent); }
   button.btn:active { background: var(--bg); }
+  button.btn.warn { border-color: var(--bad); color: var(--bad); }
+  button.btn.warn:hover { border-color: var(--bad); color: var(--bad); }
   button.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* ---------- Split layout ---------- */
@@ -331,6 +333,7 @@
       <button class="btn" id="format">Format</button>
       <button class="btn" id="sample">Sample</button>
       <button class="btn" id="clear">Clear</button>
+      <button class="btn" id="share">Share</button>
     </div>
   </header>
 
@@ -745,6 +748,68 @@
     editor.value = SAMPLE; render();
   });
 
+  /* ---------- Share via URL (base64, no backend) ---------- */
+  const SHARE_PARAM = 'json';
+
+  // Unicode-safe base64 (URL-friendly): encode UTF-8 bytes, then make it
+  // URL-safe so it survives being placed in a query string untouched.
+  function encodeShare(str){
+    const b64 = btoa(unescape(encodeURIComponent(str)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function decodeShare(token){
+    let b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return decodeURIComponent(escape(atob(b64)));
+  }
+
+  const shareBtn = document.getElementById('share');
+  shareBtn.addEventListener('click', async () => {
+    const raw = editor.value;
+    const url = new URL(window.location.href);
+    const label = shareBtn.textContent;
+
+    if (!raw.trim()) {
+      url.searchParams.delete(SHARE_PARAM);
+      history.replaceState(null, '', url);
+      shareBtn.textContent = 'Nothing to share';
+      setTimeout(() => { shareBtn.textContent = label; }, 1400);
+      return;
+    }
+
+    // Build the query manually so our URL-safe base64 chars aren't re-encoded.
+    const finalUrl = url.origin + url.pathname +
+      '?' + SHARE_PARAM + '=' + encodeShare(raw) + url.hash;
+    history.replaceState(null, '', finalUrl);
+
+    // Warn when the link nears URL-length limits. ~2000 chars is safe
+    // everywhere; browsers allow more but proxies/servers often cap here.
+    const tooLong = finalUrl.length > 2000;
+
+    try {
+      await navigator.clipboard.writeText(finalUrl);
+      shareBtn.textContent = tooLong ? 'Copied — link is long!' : 'Link copied!';
+    } catch (_) {
+      shareBtn.textContent = tooLong ? 'In URL bar — long!' : 'Link in URL bar';
+    }
+    shareBtn.classList.toggle('warn', tooLong);
+    setTimeout(() => {
+      shareBtn.textContent = label;
+      shareBtn.classList.remove('warn');
+    }, tooLong ? 3000 : 1600);
+  });
+
+  // Load shared JSON from the URL on startup, if present.
+  function loadFromUrl(){
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get(SHARE_PARAM);
+    if (!token) return false;
+    try {
+      editor.value = decodeShare(token);
+      return true;
+    } catch (_) { return false; }
+  }
+
   // Tab inserts two spaces
   editor.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
@@ -794,7 +859,7 @@
     }
   }, null, 2);
 
-  editor.value = SAMPLE;
+  if (!loadFromUrl()) editor.value = SAMPLE;
   render();
 </script>
 </body>
