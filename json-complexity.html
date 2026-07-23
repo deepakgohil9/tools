@@ -748,19 +748,52 @@
     editor.value = SAMPLE; render();
   });
 
-  /* ---------- Share via URL (base64, no backend) ---------- */
+  /* ---------- Share via URL (gzip-compressed, no backend) ---------- */
   const SHARE_PARAM = 'json';
 
-  // Unicode-safe base64 (URL-friendly): encode UTF-8 bytes, then make it
-  // URL-safe so it survives being placed in a query string untouched.
-  function encodeShare(str){
-    const b64 = btoa(unescape(encodeURIComponent(str)));
-    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // JSON is very repetitive, so we compress before encoding rather than
+  // base64-ing the raw text (which only *adds* ~33%). Uses the browser's
+  // native CompressionStream — no dependency — with a plain-base64 fallback
+  // for the rare engine that lacks it. The token's first char tags the scheme:
+  //   'c' = gzip then URL-safe base64
+  //   'u' = UTF-8 then URL-safe base64 (fallback / when compression doesn't help)
+  const hasCompression = typeof CompressionStream !== 'undefined' &&
+                         typeof DecompressionStream !== 'undefined';
+
+  // URL-safe base64 over raw bytes. The per-byte loop avoids the stack
+  // overflow that String.fromCharCode(...bytes) hits on large arrays.
+  function bytesToUrlB64(bytes){
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
-  function decodeShare(token){
-    let b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+  function urlB64ToBytes(str){
+    let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
     while (b64.length % 4) b64 += '=';
-    return decodeURIComponent(escape(atob(b64)));
+    return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  }
+
+  async function encodeShare(str){
+    const utf8 = new TextEncoder().encode(str);
+    if (hasCompression) {
+      const stream = new Blob([utf8]).stream()
+        .pipeThrough(new CompressionStream('gzip'));
+      const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+      // Only prefer the compressed form when it's actually smaller.
+      if (packed.length < utf8.length) return 'c' + bytesToUrlB64(packed);
+    }
+    return 'u' + bytesToUrlB64(utf8);
+  }
+  async function decodeShare(token){
+    const tag = token[0], body = token.slice(1);
+    if (tag === 'c') {
+      const stream = new Blob([urlB64ToBytes(body)]).stream()
+        .pipeThrough(new DecompressionStream('gzip'));
+      return await new Response(stream).text();
+    }
+    if (tag === 'u') return new TextDecoder().decode(urlB64ToBytes(body));
+    // Legacy links (no scheme tag) were plain UTF-8 base64 of the whole token.
+    return new TextDecoder().decode(urlB64ToBytes(token));
   }
 
   const shareBtn = document.getElementById('share');
@@ -779,7 +812,7 @@
 
     // Build the query manually so our URL-safe base64 chars aren't re-encoded.
     const finalUrl = url.origin + url.pathname +
-      '?' + SHARE_PARAM + '=' + encodeShare(raw) + url.hash;
+      '?' + SHARE_PARAM + '=' + await encodeShare(raw) + url.hash;
     history.replaceState(null, '', finalUrl);
 
     // Warn when the link nears URL-length limits. ~2000 chars is safe
@@ -800,12 +833,12 @@
   });
 
   // Load shared JSON from the URL on startup, if present.
-  function loadFromUrl(){
+  async function loadFromUrl(){
     const params = new URLSearchParams(window.location.search);
     const token = params.get(SHARE_PARAM);
     if (!token) return false;
     try {
-      editor.value = decodeShare(token);
+      editor.value = await decodeShare(token);
       return true;
     } catch (_) { return false; }
   }
@@ -859,8 +892,10 @@
     }
   }, null, 2);
 
-  if (!loadFromUrl()) editor.value = SAMPLE;
-  render();
+  (async () => {
+    if (!await loadFromUrl()) editor.value = SAMPLE;
+    render();
+  })();
 </script>
 </body>
 </html>
